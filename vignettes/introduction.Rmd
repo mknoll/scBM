@@ -1,0 +1,61 @@
+---
+title: "Introduction"
+author: "auth"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+# Outline
+```{r}
+####
+# Create scBM instance w/ Seurat object so
+#obj <- class("scBM", so)
+
+####
+# Apply default filters 
+#obj <- filter(obj, ...)
+
+#######
+# Identify clusters 
+# ... 
+# ... 
+
+######
+# Extract cluster metrics  -> aggregated metrics for evaluation 
+# .. # clusters, cluster size, ...
+
+######
+#####
+# Assign identity to clusters
+
+
+
+
+```
+
+##########
+
+# Overview
+This vignette demonstrates the use of the scBM package.
+
+# Requirements and installation
+The package utilizes Seurat. 
+
+```{r, eval=F}
+fl <- list.files("../R/", full.names=T) 
+for (f in fl) { source(f) }
+###
+```
+
