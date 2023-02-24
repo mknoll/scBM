@@ -16,12 +16,28 @@ knitr::opts_chunk$set(
 )
 ```
 
+```{r, eval=F}
+##### ONLY FOR TESTING ####
+#fl <- list.files("../R/", full.names=T) 
+fl <- c("../R/filter.R" ,"../R/scBMClass.R")
+for (f in fl) { source(f) }
+###
+
+require(Seurat)
+dt1 <- Read10X(data.dir = "../../data/pbmc/filtered_gene_bc_matrices/hg19/")
+so <- CreateSeuratObject(counts=dt1, project="test", min.features=200, min.cells=5)
+```
 
 # Outline
 ```{r}
+library(R6)
+
+fl <- c("../R/filter.R" ,"../R/scBMClass.R")
+for (f in fl) { source(f) }
+
 ####
 # Create scBM instance w/ Seurat object so
-#obj <- class("scBM", so)
+obj <- scBM$new(so)
 
 ####
 # Apply default filters 
@@ -53,9 +69,4 @@ This vignette demonstrates the use of the scBM package.
 # Requirements and installation
 The package utilizes Seurat. 
 
-```{r, eval=F}
-fl <- list.files("../R/", full.names=T) 
-for (f in fl) { source(f) }
-###
-```
 
