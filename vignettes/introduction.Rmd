@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 
 ```{r, eval=F}
 ##### ONLY FOR TESTING ####
-#fl <- list.files("../R/", full.names=T) 
+library(R6)
 fl <- c("../R/filter.R" ,"../R/scBMClass.R")
 for (f in fl) { source(f) }
 ###
@@ -30,8 +30,6 @@ so <- CreateSeuratObject(counts=dt1, project="test", min.features=200, min.cells
 
 # Outline
 ```{r}
-library(R6)
-
 fl <- c("../R/filter.R" ,"../R/scBMClass.R")
 for (f in fl) { source(f) }
 
@@ -41,6 +39,7 @@ obj <- scBM$new(so)
 
 ####
 # Apply default filters 
+obj <- filter(obj)
 #obj <- filter(obj, ...)
 
 #######
@@ -60,6 +59,36 @@ obj <- scBM$new(so)
 
 
 ```
+
+## Pseudocode f. cutoff detection
+
+Init:
+Filter_Number_of_ genes_filter =xx;  // any threshold , e.g. from literatur
+
+Derive Threshold:
+Computer_Mean_Nummber_of_genes (From profiles of all cells in all samples);
+Computer_SDev_Nummber_of_genes (From profiles of all celles in all samples);
+
+// Instead of mean (gauss distrbuted) :
+// derive median instead of mean + mad or Interquartile distance instead of sdev
+
+Filter_Number_of_genes = Compute_Mean_Nummber_of_genes + Compute_SDev_Nummber_of_genes // ~5% filter
+
+//In case of very divergent data: Sdev+Mean > Total number  of genes
+if Filter_Number_of_genes>Total_Numer of genes => Filter_Number_of_genes = Total_Numer of genes*0.95 
+
+Filter:
+Loop over all profiles
+         Remove_Profiles  where Number_of_ genes < Filter_Number_of_genes
+
+To detect outlier samples:
+Compute grandmean/grandsdev for all samlpes/cells  as well as Sample_i_Mean/Sampe_i_Sdev for each sample on its specidv cell profiles.
+
+Find sample where p-tests grandmens from t-test(Granmean/grandsdev vs. Samplev_Mean/DSdev) <0.05 
+Falg or Exclude such sample or handle indivdually
+
+
+
 
 ##########
 
