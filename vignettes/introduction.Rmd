@@ -16,15 +16,30 @@ knitr::opts_chunk$set(
 )
 ```
 
+```{r, eval=F}
+##### ONLY FOR TESTING ####
+library(R6)
+fl <- c("../R/filter.R" ,"../R/scBMClass.R")
+for (f in fl) { source(f) }
+###
+
+require(Seurat)
+dt1 <- Read10X(data.dir = "../../data/pbmc/filtered_gene_bc_matrices/hg19/")
+so <- CreateSeuratObject(counts=dt1, project="test", min.features=200, min.cells=5)
+```
 
 # Outline
 ```{r}
+fl <- c("../R/filter.R" ,"../R/scBMClass.R")
+for (f in fl) { source(f) }
+
 ####
 # Create scBM instance w/ Seurat object so
-#obj <- class("scBM", so)
+obj <- scBM$new(so)
 
 ####
 # Apply default filters 
+obj <- filter(obj)
 #obj <- filter(obj, ...)
 
 #######
@@ -45,6 +60,36 @@ knitr::opts_chunk$set(
 
 ```
 
+## Pseudocode f. cutoff detection
+
+Init:
+Filter_Number_of_ genes_filter =xx;  // any threshold , e.g. from literatur
+
+Derive Threshold:
+Computer_Mean_Nummber_of_genes (From profiles of all cells in all samples);
+Computer_SDev_Nummber_of_genes (From profiles of all celles in all samples);
+
+// Instead of mean (gauss distrbuted) :
+// derive median instead of mean + mad or Interquartile distance instead of sdev
+
+Filter_Number_of_genes = Compute_Mean_Nummber_of_genes + Compute_SDev_Nummber_of_genes // ~5% filter
+
+//In case of very divergent data: Sdev+Mean > Total number  of genes
+if Filter_Number_of_genes>Total_Numer of genes => Filter_Number_of_genes = Total_Numer of genes*0.95 
+
+Filter:
+Loop over all profiles
+         Remove_Profiles  where Number_of_ genes < Filter_Number_of_genes
+
+To detect outlier samples:
+Compute grandmean/grandsdev for all samlpes/cells  as well as Sample_i_Mean/Sampe_i_Sdev for each sample on its specidv cell profiles.
+
+Find sample where p-tests grandmens from t-test(Granmean/grandsdev vs. Samplev_Mean/DSdev) <0.05 
+Falg or Exclude such sample or handle indivdually
+
+
+
+
 ##########
 
 # Overview
@@ -53,9 +98,4 @@ This vignette demonstrates the use of the scBM package.
 # Requirements and installation
 The package utilizes Seurat. 
 
-```{r, eval=F}
-fl <- list.files("../R/", full.names=T) 
-for (f in fl) { source(f) }
-###
-```
 
