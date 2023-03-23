@@ -1,0 +1,190 @@
+---
+title: "ScRNA_seq"
+output: html_document
+date: "2023-03-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## ScRNA seq analysis.
+
+This document gives an overview of the scRNA analysis using Seurat for clustering and expression of genes of interest.
+This file covers an overview of Preprocessing steps, Normalization, Dimensionality reduction, clustering, and expression of target genes
+
+Loading packages
+```{r}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(Matrix)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(plotly)
+```
+
+
+## 1. Preprocessing
+After creation of the Seurat object, Cells with low feature and count number and high levels of mitochondrial RNA are eliminated. 
+```{r}
+t1 <- readRDS("/filename.rds")
+
+#Preprocessing and visualization 
+t1[["percent.mt"]] <- PercentageFeatureSet(t1, pattern = "^MT-")
+t1[["log10Genes.per.UMI"]] <- log10(t1$nFeature_RNA) / log10(t1$nCount_RNA)
+VlnPlot(t1, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+t1 <- c(t1)
+preprocessing = function(x) {
+  median_ncount <- median(x$nCount_RNA)
+  median_nfeatures <- median(x$nFeature_RNA)
+  median_mt <- median(x$percent.mt)
+  
+  mad_ncounts <- mad(x$nCount_RNA, center = median_ncount)
+  mad_nfeatures <- mad(x$nFeature_RNA, center = median_nfeatures)
+  mad_mean_mt <- mad(x$percent.mt, center = median_mt)
+  
+  total_ncounts <- median_ncount+mad_ncounts
+  total_nfeatures <- median_nfeatures+mad_nfeatures
+  total_mt <- median_mt+mad_mean_mt
+  
+  x@meta.data %>% 
+    ggplot(aes(x=nCount_RNA, y=nFeature_RNA, color=percent.mt)) + 
+    geom_point() + 
+    scale_colour_gradient(low = "gray90", high = "black") + 
+    scale_x_log10() + 
+    scale_y_log10() + 
+    theme_classic() +
+    geom_vline(xintercept = total_ncounts) +
+    geom_hline(yintercept = total_nfeatures) +
+    geom_vline(xintercept = 500) +
+    geom_hline(yintercept = 250) +
+    facet_wrap(~orig.ident)
+  
+  x<- subset(x, subset = (nFeature_RNA >= 250) & 
+                  (nFeature_RNA <= total_nfeatures) &
+                  (nCount_RNA >= 500) & 
+                  (nCount_RNA <= total_ncounts) &
+                  (percent.mt < total_mt) &
+                  (log10Genes.per.UMI > 0.8))
+ 
+}
+
+preprocessed.obj <- lapply(t1, preprocessing)
+preprocessed.obj
+```
+
+## 2. Normalization
+Preprocessed data can now be Normalized and scaled for compensating the variance of highly variable genes. 
+Methods for Normalization include 'LogNormalize', 'CLR' (Centered log ratio), 'RC' (Relative Counts), which can be employed by changing the normalization.method. Default is LogNormalize
+Finding Variable features also include different selection methods 'vst' (local polynomial regression), 'mvp' (mean.var.plot), and 'disp' (dispersion). Number of variable features is automatically selected for mvp
+Expression of Housekeeping genes is checked for viable cells
+
+```{r}
+#Normalization and Feature Selection
+GOI <- c("TGFB1", "TGFB2", "TGFB3", "TGFBR1", "TGFBR2", "TGFBR3", "SMAD1", "SMAD2", "SMAD3", "SMAD4", "SMAD7", 
+         "PIK3CA", "TNF", "TRAF6", "TRAF4", "NFKB1", "MAP3K7", "MAPK14", "MAPK1", "MAPK3", "MAPK8")
+#If only ensembl ID is available
+GOI_Ensembl <- c("ENSG00000228978", "ENSG00000223952", "ENSG00000175387",  "ENSG00000100030", "ENSG00000119699", "ENSG00000101665", " ENSG00000141646",  "ENSG00000069702", "ENSG00000163513", "ENSG00000102882", "ENSG00000092969", "ENSG00000107643", "ENSG00000105329", "ENSG00000170365", "ENSG00000166949", "ENSG00000109320", "ENSG00000106799", "ENSG00000121879", "ENSG00000232810", "ENSG00000076604", "ENSG00000135341", "ENSG00000112062", "ENSG00000175104")
+
+#Normalization 
+normalized.obj <- NormalizeData(preprocessed.obj , normalization.method = "LogNormalize", scale.factor = 10000)
+normalized.obj  <- FindVariableFeatures(normalized.obj, selection.method = "vst", nfeatures = 2000)
+all_vg_1 <- VariableFeatures(normalized.obj)
+all_genes <- rownames(normalized.obj)
+top_10 <- head(VariableFeatures(normalized.obj), 10)
+top_10
+capture.output(top_10, file = "Top_10_genes.txt")
+
+#Visualization of highly variable genes
+plot1 <- VariableFeaturePlot(normalized.obj)
+plot2 <- LabelPoints(plot = plot1, points = top_10, repel = TRUE)
+plot1 + plot2
+
+common <- intersect(all_vg_1, GOI_Ensembl)
+common
+
+plot3 <- LabelPoints(plot = plot1, points = common, repel = TRUE)
+plot1 + plot3
+
+#Scaling data
+normalized.obj <- ScaleData(normalized.obj, features = all_genes)
+normalized.obj
+head(normalized.obj@meta.data,5)
+
+#Checking for HK genes expression
+HK <- FetchData(normalized.obj, vars = c("GAPDH", "ACTB"))
+expr <- colSums(HK)
+HK_expr <- rowSums(HK)
+which(HK_expr == 0)
+```
+
+## 3. Dimensionality reduction
+The method of choice can either be linear (PCA) or non-linear (UMAP or tSNE) by changing the respective parameters. UMAP can either be generated for selected features or using dimensions of PCA (features set to NULL and use dims = )
+
+```{r}
+reduction.obj <- RunPCA(normalized.obj, npcs = 100)
+reduction.obj@reductions$pca@cell.embeddings
+reduction.obj <- RunUMAP(reduction.obj, umap.method = "umap-learn", reduction.name = "umap", n.components = 4, metric = "correlation", features = VariableFeatures(reduction.obj), verbose = TRUE, min.dist = 0.9)
+DimPlot(reduction.obj, reduction = "umap", dims = c(1,2))
+```
+
+For selecting number of dimensions one can use jackstraw and/or elbowplot. It must be noted that jackstraw takes more processing time for large datasets.
+
+```{r}
+reduction.obj <- JackStraw(reduction.obj, num.replicate = 100)
+reduction.obj <- ScoreJackStraw(reduction.obj, dims = 1:20)
+JackStrawPlot(reduction.obj, dims = 1:15)
+
+ElbowPlot(reduction.obj)
+```
+
+## 4. Clustering
+Neighbouring cells can be found either using number of dimensions or variable features from PCA or UMAP.
+Clusters can be found using louvain or leiden algorithm and by varying the resolution (0.4 to 1.4 for large data would be ideal)
+
+3D visualization is possible with plotly function
+
+```{r}
+reduction.obj<- FindNeighbors(reduction.obj, features = VariableFeatures(reduction.obj), reduction = "umap", dims = 1:4)
+clustered.obj <- FindClusters(reduction.obj, resolution = 0.5, algorithm = "louvain")
+head(Idents(clustered.obj), 5)
+UMAPPlot(clustered.obj)
+
+#3d visualization
+Embeddings(object = clustered.obj, reduction = "umap")
+plot.data <- FetchData(object = clustered.obj, vars = c("UMAP_1", "UMAP_2", "UMAP_3", "seurat_clusters"))
+plot.data$label <- paste(rownames(plot.data))
+fig <- plot_ly(data = plot.data, 
+               x = ~UMAP_1, y = ~UMAP_2, z = ~UMAP_3, 
+               color = ~seurat_clusters
+               type = "scatter3d",
+               mode = "markers",
+               marker = list(size = 5, width=2))
+               
+fig
+```
+
+## 5. Cluster annotation and target gene expression
+Cells can be manually annotated using literature and available datasets and the clusters can be re-labeled. new.cluster.ids is used to save the respective cell annotation and then changed in the object
+
+```{r}
+cell.markers <- FindAllMarkers(clustered.obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+cluster_markers <- as.data.frame(cell.markers %>%
+  group_by(cluster) %>%
+  slice_max(n = 10, order_by = avg_log2FC))
+
+new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
+    "NK", "DC", "Platelet")
+names(new.cluster.ids) <- levels(clustered.obj)
+pbmc <- RenameIdents(clustered.obj, new.cluster.ids)
+
+#Visualization
+FeaturePlot(clustered.obj, features = GOI)
+
+
+```
+
+Target gene expression can also be visualized using cellscatter(), violin plots, etc. 
