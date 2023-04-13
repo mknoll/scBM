@@ -1,27 +1,42 @@
+
+dataset <- readRDS("/dataset.rds")
+
+#pcs value is saved from dimensional reduction script
+
 #Clustering
-GBM_1 <- FindNeighbors(GBM_1, reduction = "pca", dims = 1:50)
-GBM_1 <-FindClusters(GBM_1, resolution = 0.1)
-head(Idents(GBM_1), 5)
-CalculateSilhouette(GBM_1)
-df <- as.data.frame(CalculateSilhouette(GBM_1), row.names = FALSE)
-sum(df$width <0)
-PCAPlot(GBM_1)
-UMAPPlot(GBM_1)
+dataset <- FindNeighbors(dataset, reduction = "pca", dims = 1:pcs)
+dataset <-FindClusters(dataset, resolution = 0.5)
+head(Idents(dataset), 5)
+
+dataset <- RunUMAP(dataset, reduction = "pca", dims = 1:pcs)
+DimPlot(dataset, reduction = "umap", split.by = "orig.ident")
+
+#Finding number of cells in each cluster from each dataset
+pt <- table(Idents(GBM_integrated), GBM_integrated@meta.data$orig.ident)
+pt
 
 #Extracting cluster markers
-GBM_1.markers <- FindAllMarkers(GBM_1, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-GBM_1.markers %>%
+dataset.markers <- FindAllMarkers(dataset, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+markers %>%
   group_by(cluster) %>%
-  slice_max(n = 2, order_by = avg_log2FC)
+  slice_max(n = 15, order_by = avg_log2FC)
 
 #DoHeatmap() generates an expression heatmap for given cells and features. Plotting is done for 20 markers here or all if less than 20
-GBM_1.markers %>%
+.markers %>%
   group_by(cluster) %>%
   top_n(n = 20, wt = avg_log2FC) -> top10
 DoHeatmap(GBM_1, features = top20$gene) + NoLegend()
 
-# Visualization
-VlnPlot(GBM_1, features = GOI)
-FeaturePlot(GBM_1, features = GOI)
 
 #Cluster annotation is done manually and then reassigned to the clusters
+#Given annotations are for a sample dataset
+new.cluster.ids <- c("Macrophages/Microglial cells", "Microglial cells", "Astrocytes", "Dendritic cells", "Endothelial cells", "Macrophages (proliferating)", "Macrophages", "Conventional Dendritic cell 2b", "Pericytes",
+                     " ", "Conventional Dendritic cell 2b", "T-cells", "Neutrophils", "B-cells")
+names(new.cluster.ids) <- levels(dataset)
+GBM_integrated <- RenameIdents(dataset, new.cluster.ids)
+DimPlot(dataset, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+
+# Visualization
+VlnPlot(dataset, features = GOI)
+FeaturePlot(dataset, features = GOI)
+DotPlot(dataset, features = GOI)
