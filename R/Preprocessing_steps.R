@@ -1,12 +1,4 @@
 #Preprocessing for scRNA seq
-library(dplyr)
-library(Seurat)
-library(patchwork)
-library(Matrix)
-library(ggplot2)
-library(readr)
-library(tidyverse)
-
 
 t1 <- readRDS("/filename.rds")
 
@@ -53,3 +45,5 @@ preprocessing = function(x) {
 
 preprocessed.obj <- lapply(t1, preprocessing)
 preprocessed.obj
+
+saveRDS(preprocessed.obj, "/preprocessed.rds")
